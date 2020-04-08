@@ -1,48 +1,42 @@
 ﻿using UnityEngine;
-using UnityEngine.Networking;
 
-public class ArkanoidController : NetworkBehaviour {
+namespace Tetroid {
+    [RequireComponent( typeof( BoxCollider2D ) )]
+    public class ArkanoidController : MonoBehaviour
+    {
 
-	//[SyncVar]
-	float speed = 10f;
-	float point;
+        [SerializeField]
+        float m_Speed = 10f;
+        [SerializeField]
+        Transform m_LeftLimit = null, m_RightLimit = null, m_StartPosition = null;
 
-	void Start (){
-		point = -GameManager.singleton.columnZero - 1.5f;
-	}
+        private void Awake()
+        {
+            transform.position = m_StartPosition.position;
+        }
 
-	void _OnRoundStart(int startTime){
-		Debug.Log ("Se ejecuta en arkanoid");
-		name = GameManager.singleton.p2Name;
-	}
-	
-	void Update (){
-		if (!isLocalPlayer)
-			return;
-		if (!GameManager.singleton.online) {
-			if (Input.GetKey (KeyCode.A)){
-				CmdMove( -1 );
-			}
-			if (Input.GetKey (KeyCode.D)){
-				CmdMove( 1 );
-			}
-		} else {
-			CmdMove (Input.GetAxis ("Horizontal"));
-		}
-	}
+        /// <summary>
+        /// 
+        /// </summary>
+        public void MoveLeft() { Move( -1 ); }
+        /// <summary>
+        /// 
+        /// </summary>
+        public void MoveRight() { Move( 1 ); }
 
-	[Command]
-	void CmdMove( float x ){
-		transform.position = new Vector2 (transform.position.x, GameManager.singleton.arkanoidY);
-		transform.Translate(Vector2.right * speed * x * Time.deltaTime);
+        private void Move( int x )
+        {
+            transform.Translate( Vector2.right * m_Speed * x * Time.deltaTime );
+            CheckMargins();
+        }
 
-		CheckMargins ();
-	}
+        private void CheckMargins()
+        {
+            if( transform.position.x > m_RightLimit.transform.position.x )
+                transform.position = new Vector2( m_RightLimit.transform.position.x, transform.position.y );
 
-	void CheckMargins (){
-		if (transform.position.x > point)
-			transform.position = new Vector2 (point,transform.position.y);
-		if (transform.position.x < -point)
-			transform.position = new Vector2 (-point,transform.position.y);
-	}
+            if( transform.position.x < m_LeftLimit.transform.position.x )
+                transform.position = new Vector2( m_LeftLimit.transform.position.x, transform.position.y );
+        }
+    }
 }

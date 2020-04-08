@@ -1,79 +1,89 @@
 ﻿using UnityEngine;
-using UnityEngine.Networking;
 
-public class BlockManager : NetworkBehaviour {
+namespace Tetroid
+{
+    [RequireComponent(typeof(Renderer))]
+    public class BlockManager : MonoBehaviour
+    {
+        private PieceController pieceController;
+        private bool destroying = false;
 
-	[SyncVar]
-	string myName;
+        public void Initialize(PieceController parent, GameManager.PieceType type )
+        {
+            if( destroying )
+                return;
+            this.transform.SetParent( parent.transform );
+            this.pieceController = parent;
+            this.tag = "Block";
+            this.gameObject.layer = LayerMask.NameToLayer( "Tetris" ); // Tetris Layer is only for the piece is moving
 
-	//----------------------------------
-	void Start () {
-		//	rb2d = GetComponent<Rigidbody2D> ();
-		if (!isLocalPlayer) {
-			var parent = GameObject.FindWithTag("Piece");
-			if (parent != null )
-				transform.SetParent(parent.transform);
-			tag = "Block";
-			gameObject.layer = LayerMask.NameToLayer("Tetris");  // 0-31
-		}
-		if ( isServer )
-			myName = name;
-		else
-			name = myName;
+            Material mat = GetComponent<Renderer>().material;
+            switch( type )
+            {
+                case GameManager.PieceType.L:
+                    mat.color = new Color( 1, 0.6f, 0 );
+                    break;
+                case GameManager.PieceType.J:
+                    mat.color = Color.blue;
+                    break;
+                case GameManager.PieceType.T:
+                    mat.color = Color.magenta;
+                    break;
+                case GameManager.PieceType.Z:
+                    mat.color = Color.red;
+                    break;
+                case GameManager.PieceType.S:
+                    mat.color = Color.green;
+                    break;
+                case GameManager.PieceType.O:
+                    mat.color = Color.yellow;
+                    break;
+                case GameManager.PieceType.I:
+                    mat.color = Color.cyan;
+                    break;
+            }
+        }
 
-		Material mat = null;
-		if ( mat == null ){
-			mat = GetComponent<MeshRenderer>().material;
-			mat = Instantiate ( mat );
-			switch(GameManager.singleton.piece){
-			case GameManager.PieceType.L:
-				mat.color = new Color( 1,0.6f,0);
-				break;
-			case GameManager.PieceType.J:
-				mat.color = Color.blue;
-				break;
-			case GameManager.PieceType.T:
-				mat.color = Color.magenta;
-				break;
-			case GameManager.PieceType.Z:
-				mat.color = Color.red;
-				break;
-			case GameManager.PieceType.S:
-				mat.color = Color.green;
-				break;
-			case GameManager.PieceType.O:
-				mat.color = Color.yellow;
-				break;
-			case GameManager.PieceType.I:
-				mat.color = Color.cyan;
-				break;
-			}
-		}
-		GetComponent<MeshRenderer>().material = mat;
-	}
+        public void Destroy()
+        {
+            if( destroying )
+                return;
+            destroying = true;
 
-	void Update (){
-		transform.rotation = Quaternion.identity;
-	}
-	void OnCollisionEnter2D ( Collision2D coll){
-		if (!isServer)
-			return;
-		if (coll.gameObject.tag == "Ball" && tag=="Block") {
-			GameManager.singleton.blockHitted ++;
-			switch (GameManager.singleton.ball) {
-			case GameManager.BallType.Accelerate:
-				SendMessageUpwards ("Accelerate");
-				break;
-			case GameManager.BallType.Destroy:
-				SendMessageUpwards ("DestroyBlock",gameObject);
-				break;
-			case GameManager.BallType.Freeze:
-				SendMessageUpwards ("Freeze");
-				break;
-			case GameManager.BallType.Rotate:
-				SendMessageUpwards ("Rotate");
-				break;
-			}
-		}
-	}
+            // TODO Animación
+            Destroy( gameObject );
+        }
+
+        void OnCollisionEnter2D( Collision2D coll )
+        {
+            if( destroying )
+                return;
+            if( coll.gameObject.CompareTag("Ball") )
+            {
+                GameManager.Instance.BlockHitted();
+
+                BallMove ball = coll.gameObject.GetComponent<BallMove>();
+                
+                if ( ball != null )
+                {
+                    switch( ball.BallType )
+                    {
+                        case GameManager.BallType.Accelerate:
+                            pieceController.Accelerate();
+                            break;
+                        case GameManager.BallType.Destroy:
+                            pieceController.DestroyBlock( this );
+                            break;
+                        case GameManager.BallType.Freeze:
+                            pieceController.Freeze();
+                            break;
+                        case GameManager.BallType.Rotate:
+                            if ( pieceController.Rotate() )
+                                GameManager.Instance.PieceRotated();
+                            break;
+                    }
+                }
+            }
+        }
+    }
 }

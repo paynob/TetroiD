@@ -4,8 +4,6 @@
 TagManager:
   serializedVersion: 2
   tags:
-  - NetworkManager
-  - PlayerName
   - Piece
   - Arkanoid
   - Block
@@ -23,7 +21,7 @@ TagManager:
   - Arkanoid
   - Tetris
   - Tetroid
-  - 
+  - Ball
   - 
   - 
   - 
