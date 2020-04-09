@@ -1,8 +1,8 @@
 ﻿using UnityEngine;
+using UnityEngine.UI;
 using System;
 using System.Collections;
 using TMPro;
-
 
 namespace Tetroid
 {
@@ -27,6 +27,12 @@ namespace Tetroid
 
         [SerializeField]
         private GameObject m_ContinueButton = null;
+
+        [SerializeField]
+        private Transform m_ArkanoidLifes = null;
+
+        [SerializeField]
+        private Button m_ArkanoidSpecialButton = null;
 
         [SerializeField]
         private TextMeshProUGUI m_ArkanoidPoints = null, m_TetrisPoints = null, m_ArkanoidResult = null, m_TetrisResult = null;
@@ -76,6 +82,7 @@ namespace Tetroid
         void Awake()
         {
             Instance = this;
+            GC.Collect();
         }
         private void OnDestroy()
         {
@@ -115,16 +122,45 @@ namespace Tetroid
         private int piecePlaced = 0;
         private int blockPlaced = 0;
 
-        public void BlockHitted() { blockHitted++; UpdateHUDPoints(); }
-        public void BlockDestroyed() { blockDestroyed++; UpdateHUDPoints(); }
-        public void PieceDestroyed() { pieceDestroyed++; UpdateHUDPoints(); }
-        public void PieceAccelerated() { pieceAccelerated++; UpdateHUDPoints(); }
-        public void PieceRotated() { pieceRotated++; UpdateHUDPoints(); }
-        public void PieceRotatedSuccessfully() { pieceRotatedSuccessfully++; UpdateHUDPoints(); }
-        public void PieceFreezed() { pieceFreezed++; UpdateHUDPoints(); }
-        public void RowsCompleted() { rowsCompleted++; UpdateHUDPoints(); }
-        public void PiecePlaced() { piecePlaced++; UpdateHUDPoints(); }
-        public void BlockPlaced() { blockPlaced++; UpdateHUDPoints(); }
+        public void BlockHitted() {
+            blockHitted++;
+            UpdateHUDPoints(); }
+        public void BlockDestroyed() {
+            blockDestroyed++;
+            UpdateHUDPoints();
+            UpdateHUDCharge( 0.15f ); }
+        public void PieceDestroyed() {
+            pieceDestroyed++;
+            UpdateHUDPoints(); 
+            UpdateHUDCharge( 0.30f ); }
+        public void PieceAccelerated() {
+            pieceAccelerated++;
+            UpdateHUDPoints(); 
+            UpdateHUDCharge( 0.25f );}
+        public void PieceRotated() {
+            pieceRotated++;
+            UpdateHUDPoints(); 
+            UpdateHUDCharge( 0.15f );}
+        public void PieceRotatedSuccessfully() {
+            pieceRotatedSuccessfully++;
+            UpdateHUDPoints(); 
+            UpdateHUDCharge( 0.20f );}
+        public void PieceFreezed() {
+            pieceFreezed++;
+            UpdateHUDPoints(); 
+            UpdateHUDCharge( 0.35f );}
+        public void RowsCompleted() {
+            rowsCompleted++;
+            UpdateHUDPoints(); 
+            UpdateHUDCharge( -0.5f );}
+        public void PiecePlaced() {
+            piecePlaced++;
+            UpdateHUDPoints(); 
+            UpdateHUDCharge( -0.03f );}
+        public void BlockPlaced() {
+            blockPlaced++;
+            UpdateHUDPoints(); 
+            UpdateHUDCharge( -0.01f );}
         //--------------End vars for statistics purpose-------------------
 
         /// <summary>
@@ -151,15 +187,18 @@ namespace Tetroid
         public bool RoundOver { get; private set; }
 
         private BallType ballType;
+        private BallType arkanoidChargeType;
         private PieceType pieceType;
+        private SVGImage specialButtonArea;
 
         //public int p1Points, p2Points;
         
 
         private IEnumerator Start()
         {
+            yield return new WaitForSeconds( 2) ;
             Initialize();
-            yield return new WaitForSeconds( 4 ); // Duration of the Animation
+            yield return new WaitForSeconds( 2 ); // Duration of the Animation
             m_Animator.updateMode = AnimatorUpdateMode.UnscaledTime;
             m_Animator.SetBool( "Playing", !RoundOver );
             m_Arkanoid.gameObject.SetActive( !RoundOver );
@@ -172,12 +211,107 @@ namespace Tetroid
         // Use this for initialization
         void Initialize()
         {
-            TimeScale = 1f;
+            TimeScale = 1.1f;
 
             Time.timeScale = TimeScale;
+
+            m_ArkanoidSpecialButton.interactable = false;
+            specialButtonArea = m_ArkanoidSpecialButton.transform.GetChild( 0 ).GetChild( 0 ).GetComponent<SVGImage>();
+            specialButtonArea.transform.localScale = Vector3.zero;
+
+            ResetArkanoidLifes();
             UpdateHUDPoints();
             RandomBall();
             RandomPiece();
+            RandomCharge();
+        }
+
+        private void UpdateHUDCharge(float add)
+        {
+            float scale = specialButtonArea.transform.localScale.x;
+
+            scale = Mathf.Clamp( scale + add, 0, 0.9f );
+
+            specialButtonArea.transform.localScale = scale * Vector3.one;
+
+            m_ArkanoidSpecialButton.interactable = scale >= 0.9f;
+        }
+
+        private void ResetArkanoidLifes()
+        {
+            foreach (Transform t in m_ArkanoidLifes)
+                t.gameObject.SetActive( true );
+        }
+
+        public void DropArkanoidLife()
+        {
+            Transform child = m_ArkanoidLifes.GetChild( 0 );
+            if ( child.gameObject.activeSelf )
+            {
+                child.SetAsLastSibling();
+                child.gameObject.SetActive( false );
+                m_Ball.transform.position = m_Arkanoid.transform.position + Vector3.down;
+            } else
+            {
+                RoundOver = true;
+                m_ContinueButton.SetActive( false );
+                m_Ball.gameObject.SetActive( false );
+                m_Arkanoid.gameObject.SetActive( false );
+
+                if( ArkanoidPoints > TetrisPoints )
+                {
+                    m_ArkanoidResult.text = "You Win";
+                    m_TetrisResult.text = "You Lose";
+                }
+                else if( ArkanoidPoints < TetrisPoints )
+                {
+                    m_ArkanoidResult.text = "You Lose";
+                    m_TetrisResult.text = "You Win";
+                } else
+                {
+                    m_ArkanoidResult.text = "You Lose";
+                    m_TetrisResult.text = "You Lose";
+                }
+
+                m_ArkanoidResult.gameObject.SetActive( true );
+                m_TetrisResult.gameObject.SetActive( true );
+
+                foreach( Transform t in m_StaticBlocksParent )
+                    Destroy( t.gameObject );
+                m_Animator.SetBool( "Playing", !RoundOver );
+            }
+        }
+
+        public void UseArkanoidCharge()
+        {
+            m_ArkanoidSpecialButton.interactable = false;
+            specialButtonArea.transform.localScale = Vector3.zero;
+
+            switch( arkanoidChargeType )
+            {
+                case BallType.Destroy:
+                    foreach( Transform t in m_PieceController.transform )
+                    {
+                        if ( UnityEngine.Random.Range(0,2) == 0  )
+                            t.GetComponent<BlockManager>().Destroy();
+                    }
+                    break;
+                case BallType.Accelerate:
+                    Time.timeScale *= 2;
+                    break;
+                case BallType.Freeze:
+                    m_PieceController.Freeze (4f );
+                    break;
+                case BallType.Rotate:
+                    foreach ( Transform t in m_StaticBlocksParent)
+                    {
+                        if( UnityEngine.Random.Range( 0, 6 ) == 0 )
+                            t.GetComponent<BlockDestroyer>().StartDestroyAnimation();
+                    }
+                    break;
+            }
+
+            RandomCharge();
         }
 
         private void UpdateHUDPoints()
@@ -201,6 +335,8 @@ namespace Tetroid
 #if UNITY_EDITOR
             else if( Input.GetKeyDown( KeyCode.Escape ) )
                 Pause();
+            else if ( Input.GetKeyDown( KeyCode.Space) )
+                Time.timeScale += 0.1f;
 #endif
         }
 
@@ -281,6 +417,7 @@ namespace Tetroid
         private BallType RandomBall()
         {
             ballType = (BallType)UnityEngine.Random.Range( 0, Enum.GetValues( typeof( BallType ) ).Length );
+            //ballType = BallType.Destroy; // TODO Delete
             return ballType;
         }
 
@@ -292,6 +429,29 @@ namespace Tetroid
         {
             pieceType = (PieceType)UnityEngine.Random.Range( 0, Enum.GetValues( typeof( PieceType ) ).Length );
             return pieceType;
+        }
+
+        private BallType RandomCharge()
+        {
+            arkanoidChargeType = (BallType)UnityEngine.Random.Range( 0, Enum.GetValues( typeof( BallType ) ).Length );
+            //arkanoidChargeType = BallType.Freeze; // TODO Delete
+
+            switch( arkanoidChargeType )
+            {
+                case BallType.Destroy:
+                    specialButtonArea.color = Color.red;
+                    break;
+                case BallType.Accelerate:
+                    specialButtonArea.color = Color.green;
+                    break;
+                case BallType.Freeze:
+                    specialButtonArea.color = Color.cyan;
+                    break;
+                case BallType.Rotate:
+                    specialButtonArea.color = Color.yellow;
+                    break;
+            }
+            return arkanoidChargeType;
         }
     }
 }

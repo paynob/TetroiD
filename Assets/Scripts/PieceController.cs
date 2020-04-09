@@ -18,7 +18,7 @@ namespace Tetroid {
         Vector2 startPoint;
         Collider2D[] collidersNonAlloc = new Collider2D[20];
         
-        bool freezed, rotated, accelerated, destroyed;
+        bool freezed, rotated, accelerated;
 
         private void Awake()
         {
@@ -26,7 +26,6 @@ namespace Tetroid {
         }
         private void Start()
         {
-            StartCoroutine( PieceGoDown() );
         }
 
         public void Move( Vector2 direction )
@@ -61,6 +60,7 @@ namespace Tetroid {
             for( int i = 0; i < totalBlocks; i++ )
             {
                 positionToCheck = new Vector2( transform.GetChild( i ).transform.position.x + direction.x, transform.GetChild( i ).transform.position.y + direction.y );
+                
                 colliders = Physics2D.OverlapPointAll( positionToCheck, layerMask );
                 foreach( var col in colliders )
                     if( col.gameObject.tag != "Block" )
@@ -78,7 +78,6 @@ namespace Tetroid {
 
                 freezed = false;
                 rotated = false;
-                destroyed = false;
                 accelerated = false;
 
                 if( CanMoveTo( Vector2.down ) )
@@ -104,14 +103,16 @@ namespace Tetroid {
 
             foreach ( Transform child in tetrisStaticBlocks)
             {
-                if( !lines.ContainsKey( (int)child.position.y ) )
-                    lines[(int)child.position.y] = new List<Transform>();
-                lines[(int)child.position.y].Add( child );
+                int p = (int)(child.position.y * 10) / 10;
 
-                if( (int)child.position.y > max )
-                    max = (int)child.position.y;
-                if( (int)child.position.y < min )
-                    min = (int)child.position.y;
+                if( !lines.ContainsKey( p ) )
+                    lines[p] = new List<Transform>();
+                lines[p].Add( child );
+
+                if( p > max )
+                    max = p;
+                if( p < min )
+                    min = p;
             }
 
             for( int i=min; i<= max; i++ )
@@ -120,7 +121,8 @@ namespace Tetroid {
                 {
                     foreach( var t in lines[i] )
                     {
-                        Destroy( t.gameObject );
+                        //Destroy( t.gameObject );
+                        t.GetComponent<BlockDestroyer>().StartDestroyAnimation();
                     }
 
                     GameManager.Instance.RowsCompleted();
@@ -193,18 +195,42 @@ namespace Tetroid {
             StopPiece();
         }
 
-        public void DestroyBlock( BlockManager block )
+        public void Freeze( float seconds )
         {
-            if( destroyed )
-                return;
-            destroyed = true;
-            StartCoroutine( DestroyBlockDelayed( block ) );
+            StartCoroutine( FreezeDelayed( seconds ) );
+        }
+        private IEnumerator FreezeDelayed(float seconds)
+        {
+            int steps = 10;
+            float step = seconds / (float)steps;
+            float colorStep = 0.5f / steps;
+
+            Renderer[] blocks = GetComponentsInChildren<Renderer>();
+            List<Material> materials = new List<Material>();
+
+            foreach( var b in blocks )
+                materials.Add( b.material );
+
+            for ( int i=0; i<steps; i++ )
+            {
+                yield return new WaitForSecondsRealtime( step );
+                foreach( var m in materials )
+                {
+                    float h, s, v;
+                    Color.RGBToHSV( m.color, out h, out s, out v );
+                    s = Mathf.Clamp01( s - colorStep );
+                    v = Mathf.Clamp01( v + colorStep );
+
+                    m.color = Color.HSVToRGB( h, s, v );
+                }
+            }
+
+            Freeze();
         }
 
-        IEnumerator DestroyBlockDelayed( BlockManager block )
+        public void DestroyBlock( BlockManager block )
         {
-            yield return new WaitForSeconds( Time.fixedDeltaTime );
-            block.Destroy();   //Destroy the block
+            block.Destroy();
             GameManager.Instance.BlockDestroyed();
             blocks--;
             if( blocks == 0 )
@@ -217,6 +243,9 @@ namespace Tetroid {
         public bool Spawn( GameManager.PieceType piece)
         {
             Time.timeScale = GameManager.Instance.TimeScale;
+
+            StopAllCoroutines();
+
             transform.position = startPoint;
             this.blocks = 4;
 
@@ -284,6 +313,7 @@ namespace Tetroid {
                     break;
             }
 
+            StartCoroutine( PieceGoDown() );
             return true;
         }
     }

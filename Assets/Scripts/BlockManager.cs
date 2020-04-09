@@ -7,6 +7,7 @@ namespace Tetroid
     {
         private PieceController pieceController;
         private bool destroying = false;
+        private bool inRespawnZone = false;
 
         public void Initialize(PieceController parent, GameManager.PieceType type )
         {
@@ -50,13 +51,13 @@ namespace Tetroid
                 return;
             destroying = true;
 
-            // TODO Animación
-            Destroy( gameObject );
+            GetComponent<BlockDestroyer>().StartDestroyAnimation();
+            Destroy( this );
         }
 
         void OnCollisionEnter2D( Collision2D coll )
         {
-            if( destroying )
+            if( destroying || inRespawnZone)
                 return;
             if( coll.gameObject.CompareTag("Ball") )
             {
@@ -84,6 +85,18 @@ namespace Tetroid
                     }
                 }
             }
+        }
+
+        private void OnTriggerEnter2D( Collider2D collision )
+        {
+            if( collision.CompareTag( "Respawn" ) )
+                inRespawnZone = true;
+        }
+
+        private void OnTriggerExit2D( Collider2D collision )
+        {
+            if( collision.CompareTag( "Respawn" ) )
+                inRespawnZone = false;
         }
     }
 }
